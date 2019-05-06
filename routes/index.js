@@ -9,7 +9,8 @@ router.get('/', (req, res, next) => {
   if (req.user) {
     Schedule.findAll({
       where: {
-        createdBy: req.user.id
+        createdBy: req.user.id,
+        provider: req.user.provider,
       },
       order: [['"updatedAt"', 'DESC']]
     }).then((schedules) => {

@@ -13,6 +13,11 @@ const Availability = loader.database.define('availabilities', {
     primaryKey: true,
     allowNull: false
   },
+  provider: {
+    type: Sequelize.STRING,
+    primaryKey: true,
+    allowNull: false
+  },
   availability: {
     type: Sequelize.INTEGER,
     allowNull: false,

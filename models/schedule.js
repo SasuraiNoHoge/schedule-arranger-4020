@@ -20,6 +20,10 @@ const Schedule = loader.database.define('schedules', {
     type: Sequelize.STRING,
     allowNull: false
   },
+  provider: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
   updatedAt: {
     type: Sequelize.DATE,
     allowNull: false

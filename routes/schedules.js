@@ -22,6 +22,7 @@ router.post('/', authenticationEnsurer, (req, res, next) => {
     scheduleName: req.body.scheduleName.slice(0, 255) || '（名称未設定）',
     memo: req.body.memo,
     createdBy: req.user.id,
+    provider: req.user.provider,
     updatedAt: updatedAt
   }).then((schedule) => {
     const candidateNames = req.body.candidates.trim().split('\n').map((s) => s.trim()).filter((s) => s !== "");
@@ -42,7 +43,7 @@ router.get('/:scheduleId', authenticationEnsurer, (req, res, next) => {
     include: [
       {
         model: User,
-        attributes: ['userId', 'username']
+        attributes: ['userId', 'provider', 'username']
       }],
     where: {
       scheduleId: req.params.scheduleId
@@ -59,7 +60,7 @@ router.get('/:scheduleId', authenticationEnsurer, (req, res, next) => {
           include: [
             {
               model: User,
-              attributes: ['userId', 'username']
+              attributes: ['userId', 'provider', 'username']
             }
           ],
           where: { scheduleId: schedule.scheduleId },
@@ -68,22 +69,27 @@ router.get('/:scheduleId', authenticationEnsurer, (req, res, next) => {
           // 出欠 MapMap(キー:ユーザー ID, 値:出欠Map(キー:候補 ID, 値:出欠)) を作成する
           const availabilityMapMap = new Map(); // key: userId, value: Map(key: candidateId, availability)
           availabilities.forEach((a) => {
-            const map = availabilityMapMap.get(a.user.userId) || new Map();
+            const mapKey = a.user.userId + a.user.provider;
+            const map = availabilityMapMap.get(mapKey) || new Map();
             map.set(a.candidateId, a.availability);
-            availabilityMapMap.set(a.user.userId, map);
+            availabilityMapMap.set(mapKey, map);
           });
 
           // 閲覧ユーザーと出欠に紐づくユーザーからユーザー Map (キー:ユーザー ID, 値:ユーザー) を作る
           const userMap = new Map(); // key: userId, value: User
-          userMap.set(req.user.id, {
+          const reqMapKey = req.user.id + req.user.provider;
+          userMap.set(reqMapKey, {
             isSelf: true,
             userId: req.user.id,
+            provider: req.user.provider,
             username: req.user.username
           });
           availabilities.forEach((a) => {
-            userMap.set(a.user.userId, {
-              isSelf: req.user.id === a.user.userId, // 閲覧ユーザー自身であるかを含める
+            const aMapKey = a.user.userId + a.user.provider;
+            userMap.set(aMapKey, {
+              isSelf: req.user.id === a.user.userId && req.user.provider === req.user.provider, // 閲覧ユーザー自身であるかを含める
               userId: a.user.userId,
+              provider: a.user.provider,
               username: a.user.username
             });
           });
@@ -91,11 +97,12 @@ router.get('/:scheduleId', authenticationEnsurer, (req, res, next) => {
           // 全ユーザー、全候補で二重ループしてそれぞれの出欠の値がない場合には、「欠席」を設定する
           const users = Array.from(userMap).map((keyValue) => keyValue[1]);
           users.forEach((u) => {
+            const uMapKey = u.userId + u.provider;
             candidates.forEach((c) => {
-              const map = availabilityMapMap.get(u.userId) || new Map();
+              const map = availabilityMapMap.get(uMapKey) || new Map();
               const a = map.get(c.candidateId) || 0; // デフォルト値は 0 を利用
               map.set(c.candidateId, a);
-              availabilityMapMap.set(u.userId, map);
+              availabilityMapMap.set(uMapKey, map);
             });
           });
 
@@ -105,7 +112,8 @@ router.get('/:scheduleId', authenticationEnsurer, (req, res, next) => {
           }).then((comments) => {
             const commentMap = new Map();  // key: userId, value: comment
             comments.forEach((comment) => {
-              commentMap.set(comment.userId, comment.comment);
+              const commentMapKey = comment.userId+comment.provider;
+              commentMap.set(commentMapKey, comment.comment);
             });
             res.render('schedule', {
               user: req.user,
